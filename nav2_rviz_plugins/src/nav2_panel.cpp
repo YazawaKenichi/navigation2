@@ -673,6 +673,8 @@ void Nav2Panel::loophandler()
 void Nav2Panel::handleGoalLoader()
 {
   acummulated_poses_.clear();
+  //acummulated_poses_velocity.clear();
+
 
   std::cout << "Loading Waypoints!" << std::endl;
 
@@ -696,7 +698,10 @@ void Nav2Panel::handleGoalLoader()
     auto waypoint = waypoint_iter[it->first.as<std::string>()];
     auto pose = waypoint["pose"].as<std::vector<double>>();
     auto orientation = waypoint["orientation"].as<std::vector<double>>();
+    double linear = waypoint["mode"]["change_velocity"]["max_velocity"].as<double>();
+    RCLCPP_ERROR(client_node_->get_logger(), "aaaaaaaaaaaaaaaaaa '%lf'",linear);
     acummulated_poses_.push_back(convert_to_msg(pose, orientation));
+    //acummulated_poses_velocity.push_back(convert_to_msg_velocity(linear));
   }
 
   // Publishing Waypoint Navigation marker after loading wp's
@@ -724,6 +729,15 @@ geometry_msgs::msg::PoseStamped Nav2Panel::convert_to_msg(
   return msg;
 }
 
+//geometry_msgs::msg::Twist Nav2Panel::convert_to_msg_velocity(
+//  std::vector<double> linear)
+//{
+//  auto msg = geometry_msgs::msg::Twist();
+//  msg.linear.x = linear[0];
+//
+//  return msg;
+//}
+//
 void Nav2Panel::handleGoalSaver()
 {
 // Check if the waypoints are accumulated
