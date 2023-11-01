@@ -179,5 +179,11 @@ Nav2Panel::updateWpNavigationMarkers()
 }
 ```
 
+## Publish してるインスタンス
+[navigation2/nav2_rviz_plugins/src/nav2_panel.cpp#L590-L593](https://github.com/YazawaKenichi/navigation2/blob/feat/tsukuba-challenge-2023-ex/nav2_rviz_plugins/src/nav2_panel.cpp#L590-L503)
+
+``` C++
+wp_navigation_markers_pub_ = client_node_->create_publisher<visualization_msgs::msg::MarkerArray>("waypoints", rclcpp::QoS(1).transient_local());
+```
 
 
