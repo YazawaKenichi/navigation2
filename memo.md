@@ -186,4 +186,53 @@ Nav2Panel::updateWpNavigationMarkers()
 wp_navigation_markers_pub_ = client_node_->create_publisher<visualization_msgs::msg::MarkerArray>("waypoints", rclcpp::QoS(1).transient_local());
 ```
 
+# waypoint_follower.cpp
+
+WP の情報を読み込んでると思われる部分
+
+``` C++
+//! L150
+void WaypointFollower::followWaypoints()
+{
+    auto goal = acthion_server_->get_current_goal();
+    uint32_t goal_index = goal->goal_index;
+    bool new_goal = true;
+
+    //! L202
+    if(new_goal)
+    {
+        new_goal = false;
+        ClientT::Goal client_goal;
+        client_goal.pose = goal->poses[goal_index];
+    }
+
+    //! L240
+    if(current_goal_status_.status == ActionStatus::SUCCEEDED)
+    {
+        bool is_task_executed = waypoint_task_executor_->processAtWaypoint(goal->poses[goal_index], goal_index);
+    }
+
+    //! L274
+    if(current_goal_status_.status != ActionStatus::PROCESSING && current_goal_status_.status != ActionStatus::UNKNOWN)
+    {
+        goal_index++;
+        new_goal = true;
+        if(goal_index >= goal->poses.size())
+        {
+            if(current_loop_no == no_of_loops)
+            {
+                action_server_->succeeded_current(result);
+                current_goal_status_error_code = 0;
+                return;
+            }
+            goal_index = 0;
+            current_loop_no++;
+        }
+    }
+
+    callback_group_executor_.spin_some();
+    r.sleep();
+}
+}
+```
 
