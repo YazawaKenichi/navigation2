@@ -233,6 +233,5 @@ void WaypointFollower::followWaypoints()
     callback_group_executor_.spin_some();
     r.sleep();
 }
-}
 ```
 
