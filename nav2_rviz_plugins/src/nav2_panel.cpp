@@ -691,12 +691,21 @@ void Nav2Panel::handleGoalLoader()
     return;
   }
 
+  /**
+   * SintN x = 10;  //! x = 10
+   * SIntN& r = x;  //! r = 10
+   * r = 20;        //! x = 20, r = 20
+   */
+  //! waypoint_iter は available_waypoints["waypoints"] の別名
   const YAML::Node & waypoint_iter = available_waypoints["waypoints"];
   for (YAML::const_iterator it = waypoint_iter.begin(); it != waypoint_iter.end(); ++it) {
+    //! it->first は  it に含まれるキーと値のペア（つまり要素）
     auto waypoint = waypoint_iter[it->first.as<std::string>()];
     auto pose = waypoint["pose"].as<std::vector<double>>();
     auto orientation = waypoint["orientation"].as<std::vector<double>>();
+    auto wait = waypoint["wait"].as<std_msgs::msg::bool>
     acummulated_poses_.push_back(convert_to_msg(pose, orientation));
+    acummulated_waits_.push_back(wait);
   }
 
   // Publishing Waypoint Navigation marker after loading wp's
@@ -743,17 +752,25 @@ void Nav2Panel::handleGoalSaver()
   // Save WPs to data structure
   for (unsigned int i = 0; i < acummulated_poses_.size(); ++i) {
     out << YAML::Key << "waypoint" + std::to_string(i);
+
     out << YAML::BeginMap;
+
     out << YAML::Key << "pose";
     std::vector<double> pose =
     {acummulated_poses_[i].pose.position.x, acummulated_poses_[i].pose.position.y,
       acummulated_poses_[i].pose.position.z};
     out << YAML::Value << pose;
+
     out << YAML::Key << "orientation";
     std::vector<double> orientation =
     {acummulated_poses_[i].pose.orientation.w, acummulated_poses_[i].pose.orientation.x,
       acummulated_poses_[i].pose.orientation.y, acummulated_poses_[i].pose.orientation.z};
     out << YAML::Value << orientation;
+
+    bool wait = acummulated_waits_[i];
+    out << YAML::Value << wait;
+    out << YAML::Key << "wait";
+
     out << YAML::EndMap;
   }
 
@@ -926,6 +943,7 @@ Nav2Panel::onCancel()
   waypoint_status_indicator_->clear();
   store_poses_.clear();
   acummulated_poses_.clear();
+  acummulated_waits_.clear();
 }
 
 void Nav2Panel::onResumedWp()
@@ -959,8 +977,10 @@ Nav2Panel::onNewGoal(double x, double y, double theta, QString frame)
     if (state_machine_.configuration().contains(accumulating_)) {
       waypoint_status_indicator_->clear();
       acummulated_poses_.push_back(pose);
+      acummulated_waits_.push_back(false)
     } else {
       acummulated_poses_.clear();
+      acummulated_waits_.clear();
       updateWpNavigationMarkers();
       std::cout << "Start navigation" << std::endl;
       startNavigation(pose);
@@ -1090,7 +1110,7 @@ Nav2Panel::onAccumulatedWp()
     std::cout << "Resuming waypoint" << std::endl;
   }
 
-  startWaypointFollowing(acummulated_poses_);
+  startWaypointFollowing(acummulated_poses_, acummulated_waits_);
   store_poses_ = acummulated_poses_;
   acummulated_poses_.clear();
 }
@@ -1185,10 +1205,17 @@ Nav2Panel::timerEvent(QTimerEvent * event)
 }
 
 void
-Nav2Panel::startWaypointFollowing(std::vector<geometry_msgs::msg::PoseStamped> poses)
+Nav2Panel::startWaypointFollowing(std::vector<geometry_msgs::msg::PoseStamped> poses, bool wait)
 {
-  auto is_action_server_ready =
-    waypoint_follower_action_client_->wait_for_action_server(std::chrono::seconds(5));
+  for(uint8_t i = 0; i < 100; i++)
+  {
+    out << "########## startWaypointFollowing! ##########" << endl;
+  }
+  do
+  {
+    auto is_action_server_ready =
+      waypoint_follower_action_client_->wait_for_action_server(std::chrono::seconds(5));
+  }while(wait)
   if (!is_action_server_ready) {
     RCLCPP_ERROR(
       client_node_->get_logger(), "follow_waypoints action server is not available."
@@ -1240,7 +1267,7 @@ Nav2Panel::startWaypointFollowing(std::vector<geometry_msgs::msg::PoseStamped> p
   }
 
   timer_.start(200, this);
-}
+}   //! void Nav2Panel::startWaypointFollowing(std::vector<geometry_msgs::msg::PoseStamped> poses)
 
 void
 Nav2Panel::startNavThroughPoses(std::vector<geometry_msgs::msg::PoseStamped> poses)
