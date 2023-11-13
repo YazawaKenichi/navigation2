@@ -235,3 +235,63 @@ void WaypointFollower::followWaypoints()
 }
 ```
 
+# WP に到達したときの標準出力の内容
+```
+[controller_server-5] [INFO] [1699895899.739644078] [controller_server]: Passing new path to controller.
+[controller_server-5] [INFO] [1699895899.751342308] [controller_server]: Reached the goal!
+[bt_navigator-9] [INFO] [1699895899.798471035] [bt_navigator]: Goal succeeded
+[waypoint_follower-10] [INFO] [1699895899.812896064] [waypoint_follower]: Succeeded processing waypoint 1, processing waypoint task execution
+[waypoint_follower-10] [INFO] [1699895899.812961367] [waypoint_follower]: Arrived at 1'th waypoint, sleeping for 200 milliseconds
+[waypoint_follower-10] [INFO] [1699895900.013070438] [waypoint_follower]: Task execution at waypoint 1 succeeded
+[waypoint_follower-10] [INFO] [1699895900.013188961] [waypoint_follower]: Handled task execution on waypoint 1, moving to next.
+[bt_navigator-9] [INFO] [1699895900.013991663] [bt_navigator]: Begin navigating from current location (2.54, 7.81) to (-5.59, -2.26)
+[controller_server-5] [INFO] [1699895900.035233758] [controller_server]: Received a goal, begin computing control effort.
+```
+
+# waypoint_follower
+`Succeeded processing waypoint` を出力している関数内でウェイト処理をするべきなのでは？
+
+ということでこの関数内をトレースデバッグ。
+
+## waypoint_follower/src/waypoint_follower.cpp
+``` C++
+WaypointFollower::WaypointFollower(const rclcpp::NodeOptions & options) : nav2_util::LifecycleNode("waypoint_follower", "", options), waypoint_task_executor_loader_("nav2_waypoint_follower", "nav2_core::WaypointTaskExecutor")
+{
+    nav2_util::declare_parameter_if_not_declared(this, std::string("waypoint_task_executor_plugin", rclcpp::ParameterValue(std::string("wait_at_waypoint")));
+    nav2_util::declare_parameter_if_not_declared(this, std::string("wait_at_waypoint.plugin", rclcpp::ParameterValue(std::string("nav2_waypoint_follower::WaitAtWaypoint")));
+}
+
+nav2_util::CallbackReturn WaypointFollower::on_configure(const rclcpp_lifecycle::State & /*state*/)
+{
+    try
+    {
+        waypoint_task_executor_id_ = get_parameter("wawypoint_task_executor_plugin").as_string();
+        waypoint_task_executor_type = nav2_util::get_plugin_type_param(this, waypoint_task_executor_id_);
+        waypoint_task_executor_ = waypoint_task_executor_loader_.createUniqueInstance(waypoint_task_executor_tpye_);
+        waypoint_task_executor_->initialize(node, waypoint_task_executor_id_);
+    }
+}
+
+void WaypointFollower::followWaypoints()
+{
+    RCLCPP_INFO(get_logger(), "Succeeded processing waypoint %i, processing waypoint task execution", goal_index);
+    bool is_task_executed = waypoint_task_executor_->processAtWaypoint(goal->poses[goal_index], goal_index);
+    RCLCPP_INFO(get_logger(), "Task execution at waypoint %i %s", goal_index, is_task_executed ? "succeeded" : "failed!");
+}
+```
+
+## raspicat_slam_navigation/raspicat_navigation/config/param/nav2.param.yaml
+``` YAML
+waypoint_follower:
+    ros__parameters:
+        loop_rate : 200
+        stop_on_failure: false
+        waypoint_task_executor_plugin: "wait_at_waypoint"
+        wait_at_waypoint:
+            plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+            enabled: True
+            waypoint_pause_duration: 200
+```
+
+
+
