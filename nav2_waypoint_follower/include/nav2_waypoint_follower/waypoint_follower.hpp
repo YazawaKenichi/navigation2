@@ -27,6 +27,8 @@
 #include "nav_msgs/msg/path.hpp"
 #include "nav2_util/simple_action_server.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 
 #include "nav2_util/node_utils.hpp"
 #include "nav2_core/waypoint_task_executor.hpp"
@@ -131,6 +133,9 @@ protected:
   rcl_interfaces::msg::SetParametersResult
   dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
 
+  rclcpp::Node::SharedPtr waypoint_follower_node_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr pause_resume_wp_service_client;
+
   // Dynamic parameters handler
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
 
@@ -152,6 +157,8 @@ protected:
   waypoint_task_executor_;
   std::string waypoint_task_executor_id_;
   std::string waypoint_task_executor_type_;
+
+  bool yazawa_test(bool);
 };
 
 }  // namespace nav2_waypoint_follower

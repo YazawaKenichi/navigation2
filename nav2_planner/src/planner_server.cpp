@@ -46,7 +46,7 @@ PlannerServer::PlannerServer(const rclcpp::NodeOptions & options)
   default_types_{"nav2_navfn_planner/NavfnPlanner"},
   costmap_(nullptr)
 {
-  RCLCPP_INFO(get_logger(), "Creating");
+  // RCLCPP_INFO(get_logger(), "Creating");
 
   // Declare this node's parameters
   declare_parameter("planner_plugins", default_ids_);
@@ -76,7 +76,7 @@ PlannerServer::~PlannerServer()
 nav2_util::CallbackReturn
 PlannerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Configuring");
+  // RCLCPP_INFO(get_logger(), "Configuring");
 
   costmap_ros_->configure();
   costmap_ = costmap_ros_->getCostmap();
@@ -97,10 +97,7 @@ PlannerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
         node, planner_ids_[i]);
       nav2_core::GlobalPlanner::Ptr planner =
         gp_loader_.createUniqueInstance(planner_types_[i]);
-      RCLCPP_INFO(
-        get_logger(), "Created global planner plugin %s of type %s",
-        planner_ids_[i].c_str(), planner_types_[i].c_str());
-      planner->configure(node, planner_ids_[i], tf_, costmap_ros_);
+      // RCLCPP_INFO(get_logger(), "Created global planner plugin %s of type %s", planner_ids_[i].c_str(), planner_types_[i].c_str()); planner->configure(node, planner_ids_[i], tf_, costmap_ros_);
       planners_.insert({planner_ids_[i], planner});
     } catch (const pluginlib::PluginlibException & ex) {
       RCLCPP_FATAL(
@@ -114,9 +111,7 @@ PlannerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
     planner_ids_concat_ += planner_ids_[i] + std::string(" ");
   }
 
-  RCLCPP_INFO(
-    get_logger(),
-    "Planner Server has %s planners available.", planner_ids_concat_.c_str());
+  // RCLCPP_INFO(get_logger(), "Planner Server has %s planners available.", planner_ids_concat_.c_str());
 
   double expected_planner_frequency;
   get_parameter("expected_planner_frequency", expected_planner_frequency);
@@ -156,7 +151,7 @@ PlannerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 PlannerServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Activating");
+  // RCLCPP_INFO(get_logger(), "Activating");
 
   plan_publisher_->on_activate();
   action_server_pose_->activate();
@@ -189,7 +184,7 @@ PlannerServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 PlannerServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Deactivating");
+  // RCLCPP_INFO(get_logger(), "Deactivating");
 
   action_server_pose_->deactivate();
   action_server_poses_->deactivate();
@@ -212,7 +207,7 @@ PlannerServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 PlannerServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Cleaning up");
+  // RCLCPP_INFO(get_logger(), "Cleaning up");
 
   action_server_pose_.reset();
   action_server_poses_.reset();
@@ -232,7 +227,7 @@ PlannerServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 PlannerServer::on_shutdown(const rclcpp_lifecycle::State &)
 {
-  RCLCPP_INFO(get_logger(), "Shutting down");
+  // RCLCPP_INFO(get_logger(), "Shutting down");
   return nav2_util::CallbackReturn::SUCCESS;
 }
 
@@ -262,7 +257,7 @@ bool PlannerServer::isCancelRequested(
   std::unique_ptr<nav2_util::SimpleActionServer<T>> & action_server)
 {
   if (action_server->is_cancel_requested()) {
-    RCLCPP_INFO(get_logger(), "Goal was canceled. Canceling planning action.");
+    // RCLCPP_INFO(get_logger(), "Goal was canceled. Canceling planning action.");
     action_server->terminate_all();
     return true;
   }

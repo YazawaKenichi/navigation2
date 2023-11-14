@@ -48,6 +48,8 @@ Nav2Panel::Nav2Panel(QWidget * parent)
 {
   // Create the control button and its tooltip
 
+    using namespace std::placeholders;
+
   start_reset_button_ = new QPushButton;
   pause_resume_button_ = new QPushButton;
   navigation_mode_button_ = new QPushButton;
@@ -308,8 +310,11 @@ Nav2Panel::Nav2Panel(QWidget * parent)
   running_->assignProperty(store_initial_pose_checkbox_, "enabled", false);
 
   // State entered when pause is requested
+  //! QState クラスの新しいインスタンスを生成
   paused_ = new QState();
+  //! QState オブジェクトに名前をつける
   paused_->setObjectName("pausing");
+  //! start_reset_button_ という QPushButton オブジェクトの text プロパティを Reset に設定
   paused_->assignProperty(start_reset_button_, "text", "Reset");
   paused_->assignProperty(start_reset_button_, "toolTip", shutdown_msg);
 
@@ -362,6 +367,7 @@ Nav2Panel::Nav2Panel(QWidget * parent)
   resumed_wp_->assignProperty(nr_of_loops_, "enabled", false);
   resumed_wp_->assignProperty(store_initial_pose_checkbox_, "enabled", false);
 
+  // initial_ という QState オブジェクトの exited() というシグナルが発生したときに、this の onStartup() というスロットを呼び出すように設定
   QObject::connect(initial_, SIGNAL(exited()), this, SLOT(onStartup()));
   QObject::connect(canceled_, SIGNAL(exited()), this, SLOT(onCancel()));
   QObject::connect(reset_, SIGNAL(exited()), this, SLOT(onShutdown()));
@@ -394,6 +400,8 @@ Nav2Panel::Nav2Panel(QWidget * parent)
     &Nav2Panel::initialStateHandler);
 
   // Start/Reset button click transitions
+  //! 遷移を作成。start_reset_button_ という QPushButton オブジェクトの
+  //! clicked() というシグナルが発生した場合に initial_ 状態から idle_ の状態への遷移を設定
   initial_->addTransition(start_reset_button_, SIGNAL(clicked()), idle_);
   idle_->addTransition(start_reset_button_, SIGNAL(clicked()), reset_);
   running_->addTransition(start_reset_button_, SIGNAL(clicked()), canceled_);
@@ -424,8 +432,11 @@ Nav2Panel::Nav2Panel(QWidget * parent)
   // ROSAction Transitions: So when actions are updated remotely (failing, succeeding, etc)
   // the state of the application will also update. This means that if in the processing
   // states and then goes inactive, move back to the idle state. Vise versa as well.
+  //! ROSAction の状態が INACTIVE （非アクティブ）になったときにどう動作するのか決めるインスタンス
   ROSActionQTransition * idleTransition = new ROSActionQTransition(QActionState::INACTIVE);
+  //! INACTIVE になったとき running_ に遷移
   idleTransition->setTargetState(running_);
+  //! idle_ 状態において idleTransition が発生した際に running_ 状態への遷移を行う
   idle_->addTransition(idleTransition);
 
   ROSActionQTransition * runningTransition = new ROSActionQTransition(QActionState::ACTIVE);
@@ -461,6 +472,9 @@ Nav2Panel::Nav2Panel(QWidget * parent)
   initial_thread_ = new InitialThread(client_nav_, client_loc_);
   connect(initial_thread_, &InitialThread::finished, initial_thread_, &QObject::deleteLater);
 
+  // pause_resume_wp_service_client_ = client_node_->create_service<std_srvs::srv::SetBool>("/pause_resume_wp", std::bind(&Nav2Panel::pause_resume_wp_callback_, this, _1, _2, _3));
+  pause_resume_wp_service_client_ = client_node_->create_service<std_srvs::srv::SetBool>("_", std::bind(&Nav2Panel::pause_resume_wp_callback_, this, _1, _2, _3));
+
   QSignalTransition * activeSignal = new QSignalTransition(
     initial_thread_,
     &InitialThread::navigationActive);
@@ -495,6 +509,9 @@ Nav2Panel::Nav2Panel(QWidget * parent)
       localization_status_indicator_->setText(localization_inactive);
     });
 
+  //! state_machine_ は State Machine 全体を管理するオブジェクト
+  //! addState() で新しい状態を追加している
+  //! 上までの行で各状態がどのように機能するかを定義する。下からの定義で状態遷移を管理棟に登録するというイメージか
   state_machine_.addState(pre_initial_);
   state_machine_.addState(initial_);
   state_machine_.addState(idle_);
@@ -515,7 +532,9 @@ Nav2Panel::Nav2Panel(QWidget * parent)
   state_machine_.start();
 
   // Lay out the items in the panel
+  //! 垂直のレイアウトを設定できるクラス
   QVBoxLayout * main_layout = new QVBoxLayout;
+  //! 水平のレイアウトを設定できるクラス
   QHBoxLayout * side_layout = new QHBoxLayout;
   QVBoxLayout * status_layout = new QVBoxLayout;
   QHBoxLayout * logo_layout = new QHBoxLayout;
@@ -561,6 +580,8 @@ Nav2Panel::Nav2Panel(QWidget * parent)
   main_layout->addWidget(groupBox);
   main_layout->setContentsMargins(10, 10, 10, 10);
   setLayout(main_layout);
+
+  //! 上記までがレイアウトの設定
 
   navigation_action_client_ =
     rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(
@@ -703,13 +724,25 @@ void Nav2Panel::handleGoalLoader()
     auto waypoint = waypoint_iter[it->first.as<std::string>()];
     auto pose = waypoint["pose"].as<std::vector<double>>();
     auto orientation = waypoint["orientation"].as<std::vector<double>>();
-    auto wait = waypoint["wait"].as<std_msgs::msg::bool>
+    bool wait = waypoint["wait"].as<bool>();
     acummulated_poses_.push_back(convert_to_msg(pose, orientation));
-    acummulated_waits_.push_back(wait);
+    acummulated_waits_.push_back(convert_to_msg_wait(wait));
   }
 
   // Publishing Waypoint Navigation marker after loading wp's
   updateWpNavigationMarkers();
+}
+
+bool Nav2Panel::convert_to_bool_wait(std_msgs::msg::Bool & wait)
+{
+    return wait.data;
+}
+
+std_msgs::msg::Bool Nav2Panel::convert_to_msg_wait(bool wait)
+{
+    std_msgs::msg::Bool msg = std_msgs::msg::Bool();
+    msg.data = wait;
+    return msg;
 }
 
 geometry_msgs::msg::PoseStamped Nav2Panel::convert_to_msg(
@@ -726,9 +759,9 @@ geometry_msgs::msg::PoseStamped Nav2Panel::convert_to_msg(
   msg.pose.position.z = pose[2];
 
   msg.pose.orientation.w = orientation[0];
-  msg.pose.orientation.w = orientation[1];
-  msg.pose.orientation.w = orientation[2];
-  msg.pose.orientation.w = orientation[3];
+  msg.pose.orientation.x = orientation[1];
+  msg.pose.orientation.y = orientation[2];
+  msg.pose.orientation.z = orientation[3];
 
   return msg;
 }
@@ -767,9 +800,9 @@ void Nav2Panel::handleGoalSaver()
       acummulated_poses_[i].pose.orientation.y, acummulated_poses_[i].pose.orientation.z};
     out << YAML::Value << orientation;
 
-    bool wait = acummulated_waits_[i];
-    out << YAML::Value << wait;
     out << YAML::Key << "wait";
+    bool wait = convert_to_bool_wait(acummulated_waits_[i]);
+    out << YAML::Value << wait;
 
     out << YAML::EndMap;
   }
@@ -846,6 +879,7 @@ Nav2Panel::onInitialize()
         msg->status_list.back().status == action_msgs::msg::GoalStatus::STATUS_SUCCEEDED)
       {
         store_poses_.clear();
+        store_waits_.clear();
         waypoint_status_indicator_->clear();
         loop_no_ = "0";
         loop_count_ = 0;
@@ -874,21 +908,34 @@ Nav2Panel::startThread()
 void
 Nav2Panel::onPause()
 {
+    checkStateStatus();
   QFuture<void> futureNav =
     QtConcurrent::run(
     std::bind(
       &nav2_lifecycle_manager::LifecycleManagerClient::pause,
       client_nav_.get(), std::placeholders::_1), server_timeout_);
+  /*
+   * nav2_lifecycle_manager::LifecycleManagerClient::pause 関数を非同期に実行し、
+   * server_timeout_ を引数として渡すことで、何らかの処理を行うことができます。 
+   * QFuture<void> は、この非同期処理の結果を表す Qt の型で、
+   * ここでは処理が終了したことを示す void 型を返す可能性があります。
+   */
   QFuture<void> futureLoc =
     QtConcurrent::run(
     std::bind(
       &nav2_lifecycle_manager::LifecycleManagerClient::pause,
       client_loc_.get(), std::placeholders::_1), server_timeout_);
+    for(int i = 100; i > 0; i--)
+    {
+        //RCLCPP_INFO(client_node_->get_logger(), "########## onPause ##########");
+    }
+    checkStateStatus();
 }
 
 void
 Nav2Panel::onResume()
 {
+    checkStateStatus();
   QFuture<void> futureNav =
     QtConcurrent::run(
     std::bind(
@@ -899,6 +946,11 @@ Nav2Panel::onResume()
     std::bind(
       &nav2_lifecycle_manager::LifecycleManagerClient::resume,
       client_loc_.get(), std::placeholders::_1), server_timeout_);
+    for(int i = 100; i > 0; i--)
+    {
+        //RCLCPP_INFO(client_node_->get_logger(), "########## onResume ##########");
+    }
+    checkStateStatus();
 }
 
 void
@@ -942,23 +994,27 @@ Nav2Panel::onCancel()
       this));
   waypoint_status_indicator_->clear();
   store_poses_.clear();
+  store_waits_.clear();
   acummulated_poses_.clear();
   acummulated_waits_.clear();
 }
 
 void Nav2Panel::onResumedWp()
 {
+    checkStateStatus();
   QFuture<void> future =
     QtConcurrent::run(
     std::bind(
       &Nav2Panel::onCancelButtonPressed,
       this));
   acummulated_poses_ = store_poses_;
+  acummulated_waits_ = store_waits_;
   loop_no_ = std::to_string(
     stoi(nr_of_loops_->displayText().toStdString()) -
     loop_count_);
   waypoint_status_indicator_->setText(
     QString(std::string("<b> Note: </b> Navigation is paused.").c_str()));
+    checkStateStatus();
 }
 
 void
@@ -973,11 +1029,14 @@ Nav2Panel::onNewGoal(double x, double y, double theta, QString frame)
   pose.pose.position.z = 0.0;
   pose.pose.orientation = orientationAroundZAxis(theta);
 
+  bool wait_bool = false;
+  std_msgs::msg::Bool wait = convert_to_msg_wait(wait_bool);
+
   if (store_poses_.empty()) {
     if (state_machine_.configuration().contains(accumulating_)) {
       waypoint_status_indicator_->clear();
       acummulated_poses_.push_back(pose);
-      acummulated_waits_.push_back(false)
+      acummulated_waits_.push_back(wait);
     } else {
       acummulated_poses_.clear();
       acummulated_waits_.clear();
@@ -1039,6 +1098,7 @@ Nav2Panel::onCancelButtonPressed()
 void
 Nav2Panel::onAccumulatedWp()
 {
+    checkStateStatus();
   if (acummulated_poses_.empty()) {
     state_machine_.postEvent(new ROSActionQEvent(QActionState::INACTIVE));
     waypoint_status_indicator_->setText(
@@ -1056,6 +1116,7 @@ Nav2Panel::onAccumulatedWp()
   waypoint_status_indicator_->clear();
 
   // Disable navigation modes
+  //! ボタンを押すことができないような状態にする
   navigation_mode_button_->setEnabled(false);
   pause_resume_button_->setEnabled(false);
 
@@ -1094,8 +1155,12 @@ Nav2Panel::onAccumulatedWp()
       initial_pose.pose.orientation.z = init_transform.transform.rotation.z;
       initial_pose.pose.orientation.w = init_transform.transform.rotation.w;
 
+      bool initial_wait_bool = false;
+      std_msgs::msg::Bool initial_wait = convert_to_msg_wait(initial_wait_bool);
+
       // inserting the acummulated pose
       acummulated_poses_.insert(acummulated_poses_.begin(), initial_pose);
+      acummulated_waits_.insert(acummulated_waits_.begin(), initial_wait);
       updateWpNavigationMarkers();
       initial_pose_stored_ = true;
       if (loop_count_ == 0) {
@@ -1105,6 +1170,9 @@ Nav2Panel::onAccumulatedWp()
       acummulated_poses_.erase(
         acummulated_poses_.begin(),
         acummulated_poses_.begin());
+      acummulated_waits_.erase(
+              acummulated_waits_.begin(),
+              acummulated_waits_.begin());
     }
   } else {
     std::cout << "Resuming waypoint" << std::endl;
@@ -1112,7 +1180,10 @@ Nav2Panel::onAccumulatedWp()
 
   startWaypointFollowing(acummulated_poses_, acummulated_waits_);
   store_poses_ = acummulated_poses_;
+  store_waits_ = acummulated_waits_;
   acummulated_poses_.clear();
+  acummulated_waits_.clear();
+    checkStateStatus();
 }
 
 void
@@ -1126,7 +1197,9 @@ void
 Nav2Panel::onAccumulating()
 {
   acummulated_poses_.clear();
+  acummulated_waits_.clear();
   store_poses_.clear();
+  store_waits_.clear();
   loop_count_ = 0;
   loop_no_ = "0";
   initial_pose_stored_ = false;
@@ -1205,17 +1278,9 @@ Nav2Panel::timerEvent(QTimerEvent * event)
 }
 
 void
-Nav2Panel::startWaypointFollowing(std::vector<geometry_msgs::msg::PoseStamped> poses, bool wait)
+Nav2Panel::startWaypointFollowing(std::vector<geometry_msgs::msg::PoseStamped> poses, std::vector<std_msgs::msg::Bool> waits)
 {
-  for(uint8_t i = 0; i < 100; i++)
-  {
-    out << "########## startWaypointFollowing! ##########" << endl;
-  }
-  do
-  {
-    auto is_action_server_ready =
-      waypoint_follower_action_client_->wait_for_action_server(std::chrono::seconds(5));
-  }while(wait)
+  auto is_action_server_ready = waypoint_follower_action_client_->wait_for_action_server(std::chrono::seconds(5));
   if (!is_action_server_ready) {
     RCLCPP_ERROR(
       client_node_->get_logger(), "follow_waypoints action server is not available."
@@ -1225,6 +1290,7 @@ Nav2Panel::startWaypointFollowing(std::vector<geometry_msgs::msg::PoseStamped> p
 
   // Send the goal poses
   waypoint_follower_goal_.poses = poses;
+  waypoint_follower_goal_.waits = waits;
   waypoint_follower_goal_.goal_index = goal_index_;
   waypoint_follower_goal_.number_of_loops = stoi(loop_no_);
 
@@ -1408,6 +1474,7 @@ Nav2Panel::updateWpNavigationMarkers()
     arrow_marker.type = visualization_msgs::msg::Marker::ARROW;
     arrow_marker.action = visualization_msgs::msg::Marker::ADD;
     arrow_marker.pose = acummulated_poses_[i].pose;
+    // arrow_marker.wait = acummulated_waits_[i];
     arrow_marker.scale.x = 0.3;
     arrow_marker.scale.y = 0.05;
     arrow_marker.scale.z = 0.02;
@@ -1426,6 +1493,7 @@ Nav2Panel::updateWpNavigationMarkers()
     circle_marker.type = visualization_msgs::msg::Marker::SPHERE;
     circle_marker.action = visualization_msgs::msg::Marker::ADD;
     circle_marker.pose = acummulated_poses_[i].pose;
+    // circle_marker.wait = acummulated_waits_[i];
     circle_marker.scale.x = 0.05;
     circle_marker.scale.y = 0.05;
     circle_marker.scale.z = 0.05;
@@ -1444,6 +1512,7 @@ Nav2Panel::updateWpNavigationMarkers()
     marker_text.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
     marker_text.action = visualization_msgs::msg::Marker::ADD;
     marker_text.pose = acummulated_poses_[i].pose;
+    // marker_text.wait = acummulated_waits_[i];
     marker_text.pose.position.z += 0.2;  // draw it on top of the waypoint
     marker_text.scale.x = 0.07;
     marker_text.scale.y = 0.07;
@@ -1465,6 +1534,75 @@ Nav2Panel::updateWpNavigationMarkers()
   }
 
   wp_navigation_markers_pub_->publish(std::move(marker_array));
+}
+
+void Nav2Panel::pause_resume_wp_callback_(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+{
+    (void)request_header;
+    response->success = true;
+    RCLCPP_INFO(client_node_->get_logger(), "\x1b[30m\x1b[47mReceive request->data(%s)\x1b[0m", request->data ? "true" : "false");
+    if(!request->data && !accumulated_wp_->active())
+    {
+        // QFuture<void> future = QtConcurrent::run(std::bind(&Nav2Panel::onAccumulatedWp, this));
+        response->message = "Restart";
+    }
+    if(request->data && !resumed_wp_->active())
+    {
+        // QFuture<void> future = QtConcurrent::run(std::bind(&Nav2Panel::onResumedWp, this));
+        response->message = "Stop";
+    }
+}
+
+void Nav2Panel::checkStateStatus()
+{
+    if(pre_initial_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36mpre_initial_->active()\x1b[0m");
+    }
+    if(initial_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36minitial_->active()\x1b[0m");
+    }
+    if(idle_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36midle_->active()\x1b[0m");
+    }
+    if(accumulating_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36maccumulating_->active()\x1b[0m");
+    }
+    if(accumulated_wp_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36maccumulated_wp_->active()\x1b[0m");
+    }
+    if(accumulated_nav_through_poses_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36maccumulated_nav_through_poses_->active()\x1b[0m");
+    }
+    if(canceled_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36mcanceled_->active()\x1b[0m");
+    }
+    if(reset_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36mreset_->active()\x1b[0m");
+    }
+    if(running_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36mrunning_->active()\x1b[0m");
+    }
+    if(paused_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36mpaused_->active()\x1b[0m");
+    }
+    if(resumed_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36mresumed_->active()\x1b[0m");
+    }
+    if(resumed_wp_->active())
+    {
+        RCLCPP_INFO(client_node_->get_logger(), "\x1b[36mresumed_wp_->active()\x1b[0m");
+    }
 }
 
 inline QString

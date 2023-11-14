@@ -8,6 +8,7 @@ uint16 TASK_EXECUTOR_FAILED=601
 uint32 number_of_loops
 uint32 goal_index 0
 geometry_msgs/PoseStamped[] poses
+std_msgs/Bool[] waits
 ---
 #result definition
 MissedWaypoint[] missed_waypoints

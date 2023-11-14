@@ -37,6 +37,7 @@
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/create_timer_ros.h"
 #include "tf2_ros/buffer.h"
+#include "std_srvs/srv/set_bool.hpp"
 
 class QPushButton;
 
@@ -93,12 +94,15 @@ private:
   std::string base_frame_;
 
   // Call to send NavigateToPose action request for goal poses
+    bool convert_to_bool_wait(std_msgs::msg::Bool & wait);
+  std_msgs::msg::Bool convert_to_msg_wait(bool wait);
   geometry_msgs::msg::PoseStamped convert_to_msg(
     std::vector<double> pose,
     std::vector<double> orientation);
-  void startWaypointFollowing(std::vector<geometry_msgs::msg::PoseStamped> poses);
+  void startWaypointFollowing(std::vector<geometry_msgs::msg::PoseStamped> poses, std::vector<std_msgs::msg::Bool> waits);
   void startNavigation(geometry_msgs::msg::PoseStamped);
   void startNavThroughPoses(std::vector<geometry_msgs::msg::PoseStamped> poses);
+  void resume_service_callback_();
   using NavigationGoalHandle =
     rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>;
   using WaypointFollowerGoalHandle =
@@ -108,6 +112,8 @@ private:
 
   // The (non-spinning) client node used to invoke the action client
   rclcpp::Node::SharedPtr client_node_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr pause_resume_wp_service_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr waypoint_waiter_client_;
 
   // Timeout value when waiting for action servers to respnd
   std::chrono::milliseconds server_timeout_;
@@ -194,7 +200,9 @@ private:
   QState * accumulated_nav_through_poses_{nullptr};
 
   std::vector<geometry_msgs::msg::PoseStamped> acummulated_poses_;
+  std::vector<std_msgs::msg::Bool> acummulated_waits_;
   std::vector<geometry_msgs::msg::PoseStamped> store_poses_;
+  std::vector<std_msgs::msg::Bool> store_waits_;
 
   // Publish the visual markers with the waypoints
   void updateWpNavigationMarkers();
@@ -223,6 +231,8 @@ private:
 
   // Waypoint navigation visual markers publisher
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr wp_navigation_markers_pub_;
+    void pause_resume_wp_callback_(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+    void checkStateStatus();
 };
 
 class InitialThread : public QThread

@@ -79,7 +79,9 @@ ControllerServer::~ControllerServer()
 nav2_util::CallbackReturn
 ControllerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
+    using namespace std::placeholders;
   auto node = shared_from_this();
+  wait_waypoint_ = false;
 
   RCLCPP_INFO(get_logger(), "Configuring controller interface");
 
@@ -194,6 +196,8 @@ ControllerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 
   odom_sub_ = std::make_unique<nav_2d_utils::OdomSubscriber>(node);
   vel_publisher_ = create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 1);
+  wait_waypoint_service_client_ = node->create_service<std_srvs::srv::SetBool>("/wait_waypoint",
+          std::bind(&ControllerServer::wait_waypoint_callback_, this, _1, _2, _3));
 
   // Create the action server that we implement with our followPath method
   action_server_ = std::make_unique<ActionServer>(
@@ -278,6 +282,7 @@ ControllerServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
   odom_sub_.reset();
   vel_publisher_.reset();
   speed_limit_sub_.reset();
+  wait_waypoint_service_client_.reset()
 
   return nav2_util::CallbackReturn::SUCCESS;
 }
@@ -588,10 +593,20 @@ void ControllerServer::updateGlobalPath()
 
 void ControllerServer::publishVelocity(const geometry_msgs::msg::TwistStamped & velocity)
 {
-  auto cmd_vel = std::make_unique<geometry_msgs::msg::Twist>(velocity.twist);
-  if (vel_publisher_->is_activated() && vel_publisher_->get_subscription_count() > 0) {
-    vel_publisher_->publish(std::move(cmd_vel));
-  }
+    auto cmd_vel = std::make_unique<geometry_msgs::msg::Twist>(velocity.twist);
+    if(wait_waypoint_)
+    {
+      cmd_vel->linear.x = 0.0;
+      cmd_vel->linear.y = 0.0;
+      cmd_vel->linear.z = 0.0;
+      cmd_vel->angular.x = 0.0;
+      cmd_vel->angular.y = 0.0;
+      cmd_vel->angular.z = 0.0;
+    }
+    if (vel_publisher_->is_activated() && vel_publisher_->get_subscription_count() > 0)
+    {
+        vel_publisher_->publish(std::move(cmd_vel));
+    }
 }
 
 void ControllerServer::publishZeroVelocity()
@@ -698,6 +713,22 @@ ControllerServer::dynamicParametersCallback(std::vector<rclcpp::Parameter> param
 
   result.successful = true;
   return result;
+}
+
+void ControllerServer::wait_waypoint_callback_(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+{
+  (void) request_header;
+  response->success = true;
+  if(!request->data)
+  {
+    wait_waypoint_ = false;
+    response->message = "Restart";
+  }
+  if(request->data)
+  {
+    wait_waypoint_ = true;
+    response->message = "Stop";
+  }
 }
 
 }  // namespace nav2_controller

@@ -253,6 +253,26 @@ void WaypointFollower::followWaypoints()
 
 ということでこの関数内をトレースデバッグ。
 
+## waypoint_follower/include/waypoint_follower/waypoint_follower.hpp
+``` C++
+#include "nav2_core/waypoint_task_executor.hpp"
+
+namespace nav2_waypoint_follower
+{
+class WaypointFollower : public nav2_util::LifecycleNode
+{
+public:
+    explicit WaypointFollower(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+protected:
+    nav2_util::CallbackReturn on_configure(const rclcpp_lifecycle::State & state) override;
+    void followWaypoints();
+    pluginlib::ClassLoader<nav2_core::WaypointTaskExecutor> waypoint_task_executor_loader_;
+    pluginlib::UniquePtr<nav2_core::WaypointTaskExecutor> waypoint_task_executor_;
+    atd::unique_ptr<ActionServer> action_server_;
+    std::string waypoint_task_executor_id_;
+    std::string waypoint_task_executor_type_;
+```
+
 ## waypoint_follower/src/waypoint_follower.cpp
 ``` C++
 WaypointFollower::WaypointFollower(const rclcpp::NodeOptions & options) : nav2_util::LifecycleNode("waypoint_follower", "", options), waypoint_task_executor_loader_("nav2_waypoint_follower", "nav2_core::WaypointTaskExecutor")
@@ -263,6 +283,12 @@ WaypointFollower::WaypointFollower(const rclcpp::NodeOptions & options) : nav2_u
 
 nav2_util::CallbackReturn WaypointFollower::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
+    action_server_ = std::make_unique<ActionServer>(
+        get_node_base_interface(),
+        get_node_clock_interface(),
+        get_node_logging_interface(),
+        get_node_waitables_interface(),
+        "follow_waypoints", std::bind(&WaypointFollower::followWaypoints, this));
     try
     {
         waypoint_task_executor_id_ = get_parameter("wawypoint_task_executor_plugin").as_string();
@@ -274,9 +300,17 @@ nav2_util::CallbackReturn WaypointFollower::on_configure(const rclcpp_lifecycle:
 
 void WaypointFollower::followWaypoints()
 {
-    RCLCPP_INFO(get_logger(), "Succeeded processing waypoint %i, processing waypoint task execution", goal_index);
-    bool is_task_executed = waypoint_task_executor_->processAtWaypoint(goal->poses[goal_index], goal_index);
-    RCLCPP_INFO(get_logger(), "Task execution at waypoint %i %s", goal_index, is_task_executed ? "succeeded" : "failed!");
+    auto goal = action_server_->get_current_goal();
+    if(current_goal_status_.status == ActionStatus::Failed)
+    {
+        ...
+    }
+    else
+    {
+        RCLCPP_INFO(get_logger(), "Succeeded processing waypoint %i, processing waypoint task execution", goal_index);
+        bool is_task_executed = waypoint_task_executor_->processAtWaypoint(goal->poses[goal_index], goal_index);
+        RCLCPP_INFO(get_logger(), "Task execution at waypoint %i %s", goal_index, is_task_executed ? "succeeded" : "failed!");
+    }
 }
 ```
 
@@ -293,5 +327,43 @@ waypoint_follower:
             waypoint_pause_duration: 200
 ```
 
+## nav2_core/include/nav2_core/waypoint_task_executor.hpp
+``` C++
+namespace nav2_core
+{
+class WaypointTaskExecutor
+{
+public:
+    virtual bool processAtWaypoint(const geometry_msgs::msg::PoseStamped & curr_pose, const int & curr_waypoint_index) = 0;
+}
+}
+```
 
+> このコードは、抽象クラス（pure virtual class）の中で定義された仮想関数（pure virtual function）の一例です。
+> 
+> この関数は processAtWaypoint と呼ばれ、その目的はロボットがウェイポイントに到着した際に実行されるタスクの本体を定義することです。この関数は純粋仮想関数であり、実装を持たずに単なるインターフェースを提供しています。
+> 
+> 機能の概要は次の通りです：
+> 
+> 目的: ロボットが特定のウェイポイントに到達した際に実行するタスクを定義する。
+> 引数:
+> curr_pose: ロボットの現在の姿勢（位置と向き）を表す geometry_msgs::msg::PoseStamped オブジェクト。
+> curr_waypoint_index: ロボットが到達したウェイポイントのインデックス。ウェイポイントのリストの中でどの目的地に到達したかを示す整数。
+> 戻り値:
+> true : タスクの実行が成功したことを示すブール値。
+> false : タスクの実行が失敗したことを示すブール値。
+> この関数は抽象クラス内に純粋仮想関数として宣言されているため、このクラスを継承したサブクラスで必ず実装しなければなりません。サブクラスでこの関数をオーバーライドすることで、特定のウェイポイントに到達した際の具体的なタスクをカスタマイズすることができます。
+( Chat-GPT )
+
+## まとめ
+まとめると、`processAtWaypoint()` を改造すれば良さそう。
+`processAtWaypoint()` は `waypoint_task_executor_` のメンバ関数。
+`nav2_core/waypoint_task_executor.hpp` で定義されてそう...
+
+# nav2_rviz_plugins/src/nav2_panel.cpp
+`pause_resume_button_` を `service` を用いて切り替えたい
+
+特定の wp に到着したら自動的に pause
+
+任意のキーを押すことで resume
 

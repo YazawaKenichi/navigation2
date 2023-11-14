@@ -35,6 +35,7 @@
 #include "nav2_util/robot_utils.hpp"
 #include "pluginlib/class_loader.hpp"
 #include "pluginlib/class_list_macros.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 
 namespace nav2_controller
 {
@@ -221,6 +222,10 @@ protected:
   std::unique_ptr<nav_2d_utils::OdomSubscriber> odom_sub_;
   rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::Twist>::SharedPtr vel_publisher_;
   rclcpp::Subscription<nav2_msgs::msg::SpeedLimit>::SharedPtr speed_limit_sub_;
+
+  void wait_waypoint_callback_(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr wait_waypoint_service_client_;
+  bool wait_waypoint_;
 
   // Progress Checker Plugin
   pluginlib::ClassLoader<nav2_core::ProgressChecker> progress_checker_loader_;
