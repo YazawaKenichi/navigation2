@@ -223,9 +223,9 @@ protected:
   rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::Twist>::SharedPtr vel_publisher_;
   rclcpp::Subscription<nav2_msgs::msg::SpeedLimit>::SharedPtr speed_limit_sub_;
 
-  void wait_waypoint_callback_(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr wait_waypoint_service_client_;
-  bool wait_waypoint_;
+  void wait_waypoint_callback_controller_server_(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr wait_waypoint_service_client_controller_server_;
+  bool wait_waypoint_controller_server_;
 
   // Progress Checker Plugin
   pluginlib::ClassLoader<nav2_core::ProgressChecker> progress_checker_loader_;

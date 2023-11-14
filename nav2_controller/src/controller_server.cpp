@@ -81,7 +81,7 @@ ControllerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
     using namespace std::placeholders;
   auto node = shared_from_this();
-  wait_waypoint_ = false;
+  wait_waypoint_controller_server_ = false;
 
   RCLCPP_INFO(get_logger(), "Configuring controller interface");
 
@@ -196,8 +196,8 @@ ControllerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 
   odom_sub_ = std::make_unique<nav_2d_utils::OdomSubscriber>(node);
   vel_publisher_ = create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 1);
-  wait_waypoint_service_client_ = node->create_service<std_srvs::srv::SetBool>("/wait_waypoint",
-          std::bind(&ControllerServer::wait_waypoint_callback_, this, _1, _2, _3));
+  wait_waypoint_service_client_controller_server_ = node->create_service<std_srvs::srv::SetBool>("_",
+          std::bind(&ControllerServer::wait_waypoint_callback_controller_server_, this, _1, _2, _3));
 
   // Create the action server that we implement with our followPath method
   action_server_ = std::make_unique<ActionServer>(
@@ -282,7 +282,7 @@ ControllerServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
   odom_sub_.reset();
   vel_publisher_.reset();
   speed_limit_sub_.reset();
-  wait_waypoint_service_client_.reset()
+  wait_waypoint_service_client_controller_server_.reset()
 
   return nav2_util::CallbackReturn::SUCCESS;
 }
@@ -594,7 +594,7 @@ void ControllerServer::updateGlobalPath()
 void ControllerServer::publishVelocity(const geometry_msgs::msg::TwistStamped & velocity)
 {
     auto cmd_vel = std::make_unique<geometry_msgs::msg::Twist>(velocity.twist);
-    if(wait_waypoint_)
+    if(wait_waypoint_controller_server_)
     {
       cmd_vel->linear.x = 0.0;
       cmd_vel->linear.y = 0.0;
@@ -715,18 +715,18 @@ ControllerServer::dynamicParametersCallback(std::vector<rclcpp::Parameter> param
   return result;
 }
 
-void ControllerServer::wait_waypoint_callback_(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+void ControllerServer::wait_waypoint_callback_controller_server_(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response)
 {
   (void) request_header;
   response->success = true;
   if(!request->data)
   {
-    wait_waypoint_ = false;
+    wait_waypoint_controller_server_ = false;
     response->message = "Restart";
   }
   if(request->data)
   {
-    wait_waypoint_ = true;
+    wait_waypoint_controller_server_ = true;
     response->message = "Stop";
   }
 }

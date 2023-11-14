@@ -46,10 +46,12 @@ VelocitySmoother::~VelocitySmoother()
 nav2_util::CallbackReturn
 VelocitySmoother::on_configure(const rclcpp_lifecycle::State &)
 {
+    using namespace std::placeholders;
   RCLCPP_INFO(get_logger(), "Configuring velocity smoother");
-  auto node = shared_from_this();
+  node = shared_from_this();
   std::string feedback_type;
   double velocity_timeout_dbl;
+  wait_waypoint_ = false;
 
   // Smoothing metadata
   declare_parameter_if_not_declared(node, "smoothing_frequency", rclcpp::ParameterValue(20.0));
@@ -117,6 +119,8 @@ VelocitySmoother::on_configure(const rclcpp_lifecycle::State &)
   cmd_sub_ = create_subscription<geometry_msgs::msg::Twist>(
     "cmd_vel", rclcpp::QoS(1),
     std::bind(&VelocitySmoother::inputCommandCallback, this, std::placeholders::_1));
+  wait_waypoint_service_client_ = node->create_service<std_srvs::srv::SetBool>("/wait_waypoint",
+          std::bind(&VelocitySmoother::wait_waypoint_callback_, this, _1, _2, _3));
 
   return nav2_util::CallbackReturn::SUCCESS;
 }
@@ -162,6 +166,7 @@ VelocitySmoother::on_cleanup(const rclcpp_lifecycle::State &)
   smoothed_cmd_pub_.reset();
   odom_smoother_.reset();
   cmd_sub_.reset();
+  wait_waypoint_service_client_.reset();
   return nav2_util::CallbackReturn::SUCCESS;
 }
 
@@ -176,6 +181,25 @@ void VelocitySmoother::inputCommandCallback(const geometry_msgs::msg::Twist::Sha
 {
   command_ = msg;
   last_command_time_ = now();
+}
+
+void VelocitySmoother::wait_waypoint_callback_(const std::shared_ptr<rmw_request_id_t> request_header,
+      const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+      const std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+{
+  (void) request_header;
+  response->success = true;
+  if(!request->data)
+  {
+    wait_waypoint_ = false;
+    response->message = "Restart";
+  }
+  if(request->data)
+  {
+    wait_waypoint_ = true;
+    response->message = "Stop";
+  }
+    RCLCPP_INFO(get_logger(), "\x1b[30m\x1b[47mReceive request->data(%s)\x1b[0m", request->data ? "true" : "false");
 }
 
 double VelocitySmoother::findEtaConstraint(
@@ -210,6 +234,15 @@ double VelocitySmoother::applyConstraints(
 void VelocitySmoother::smootherTimer()
 {
   auto cmd_vel = std::make_unique<geometry_msgs::msg::Twist>();
+    if(wait_waypoint_)
+    {
+      cmd_vel->linear.x = 0.0;
+      cmd_vel->linear.y = 0.0;
+      cmd_vel->linear.z = 0.0;
+      cmd_vel->angular.x = 0.0;
+      cmd_vel->angular.y = 0.0;
+      cmd_vel->angular.z = 0.0;
+    }
 
   // Check for velocity timeout. If nothing received, publish zeros to stop robot
   if (now() - last_command_time_ > velocity_timeout_) {

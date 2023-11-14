@@ -25,6 +25,7 @@
 #include "nav2_util/lifecycle_node.hpp"
 #include "nav2_util/node_utils.hpp"
 #include "nav2_util/odometry_utils.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 
 namespace nav2_velocity_smoother
 {
@@ -71,6 +72,13 @@ public:
   double applyConstraints(
     const double v_curr, const double v_cmd,
     const double accel, const double decel, const double eta);
+
+  void wait_waypoint_callback_(const std::shared_ptr<rmw_request_id_t> request_header,
+          const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+          const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  std::shared_ptr<nav2_util::LifecycleNode> node;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr wait_waypoint_service_client_;
+  bool wait_waypoint_;
 
 protected:
   /**
@@ -153,6 +161,8 @@ protected:
   rclcpp::Time last_command_time_;
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
+
+private:
 };
 
 }  // namespace nav2_velocity_smoother

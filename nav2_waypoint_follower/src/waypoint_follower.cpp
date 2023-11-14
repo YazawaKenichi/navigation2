@@ -34,7 +34,7 @@ WaypointFollower::WaypointFollower(const rclcpp::NodeOptions & options)
     "nav2_core::WaypointTaskExecutor")
 {
   waypoint_follower_node_ = std::make_shared<rclcpp::Node>("waypoint_follower_node");
-  pause_resume_wp_service_client = waypoint_follower_node_->create_client<std_srvs::srv::SetBool>("/pause_resume_wp");
+  pause_resume_wp_service_client = waypoint_follower_node_->create_client<std_srvs::srv::SetBool>("/wait_waypoint");
   RCLCPP_INFO(get_logger(), "Creating");
 
   declare_parameter("stop_on_failure", true);
@@ -375,7 +375,7 @@ bool WaypointFollower::yazawa_test(bool wait)
     auto pause_resume_wp_service_request = std::make_shared<std_srvs::srv::SetBool::Request>();
     pause_resume_wp_service_request->data = wait ? true : false; 
     auto pause_resume_wp_service_future = pause_resume_wp_service_client->async_send_request(pause_resume_wp_service_request);
-    // RCLCPP_INFO(waypoint_follower_node_->get_logger(), "\x1b[30m\x1b[47mSend request->data(%s)\x1b[0m", pause_resume_wp_service_request->data ? "true" : "false");
+    RCLCPP_INFO(waypoint_follower_node_->get_logger(), "\x1b[30m\x1b[47mWaypointFollower request->data(%s)\x1b[0m", pause_resume_wp_service_request->data ? "true" : "false");
     return true;
 }
 
