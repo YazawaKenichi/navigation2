@@ -2,24 +2,19 @@
 
 int main(int argc, char * argv[])
 {
-    char key = ' ';
+    std::cout << " init" << std::endl;
     rclcpp::init(argc, argv);
-    auto node = rclcpp::Node::make_shared("yazaop");
-    auto service_client = node->create_client<std_srvs::srv::SetBool>("/wait_waypoint");
-    auto service_request = std::make_shared<std_srvs::srv::SetBool::Request>();
-    while(rclcpp::ok())
-    {
-        key = getch();
-        if(key)
-        {
-            service_request->data = true;
-            auto service_future = service_client->async_send_request(service_request);
-            service_request->data = false;
-            std::cout << "----- Debug Line (" << key << ") -----" << std::endl;
-        }
-        rclcpp::spin_some(node);
-    }
+    std::cout << " exe " << std::endl;
+    rclcpp::executors::SingleThreadedExecutor exe;
+    std::cout << " make_shared " << std::endl;
+    auto node = std::make_shared<Nav2Keyboard>(rclcpp::NodeOptions());
+    std::cout << " add_node " << std::endl;
+    exe.add_node(node->get_node_base_interface());
+    std::cout << " spin " << std::endl;
+    exe.spin();
+    std::cout << " shutdown " << std::endl;
     rclcpp::shutdown();
+    std::cout << " return " << std::endl;
     return 0;
 }
 
