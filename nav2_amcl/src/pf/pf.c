@@ -288,10 +288,21 @@ void pf_update_sensor(pf_t * pf, pf_sensor_model_fn_t sensor_fn, void * sensor_d
   }
 }
 
+#include <stdio.h>
+#include <time.h>
+
+void Writer(char * path, double sec)
+{
+    FILE *fp = fopen(path, "a");
+    fprintf(fp, "%f\r\n", sec);
+    fclose(fp);
+}
 
 // Resample the distribution
 void pf_update_resample(pf_t * pf, void * random_pose_data)
 {
+    //! 時間計測開始
+    long start = clock();
   int i;
   double total;
   pf_sample_set_t * set_a, * set_b;
@@ -421,6 +432,10 @@ void pf_update_resample(pf_t * pf, void * random_pose_data)
   pf_update_converged(pf);
 
   free(c);
+    //! 時間計測終了
+    long stop = clock();
+    double sec = (start - stop) / CLOCKS_PER_SEC;
+    Writer("./AmclResampling", sec);
 }
 
 

@@ -33,7 +33,6 @@
 
 #include "nav2_amcl/map/map.hpp"
 
-
 // Create a new map
 map_t * map_alloc(void)
 {

@@ -42,6 +42,7 @@ set(library_name ${executable_name}_core)
 
 add_library(${library_name} SHARED
   src/amcl_node.cpp
+  src/TimeCounter.cpp
 )
 
 target_include_directories(${library_name} PRIVATE src/include)

@@ -24,6 +24,7 @@
 #include <string.h>
 #include <queue>
 #include "nav2_amcl/map/map.hpp"
+#include "nav2_amcl/TimeCounter.hpp"
 
 /*
  * @class CellData
