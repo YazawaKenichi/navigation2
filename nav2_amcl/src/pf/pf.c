@@ -36,7 +36,7 @@
 #include "nav2_amcl/pf/pf_kdtree.hpp"
 
 #include "nav2_amcl/portable_utils.hpp"
-
+#include "ClockCounter.h"
 
 // Compute the required number of samples, given that there are k bins
 // with samples in them.
@@ -301,8 +301,8 @@ void Writer(char * path, double sec)
 // Resample the distribution
 void pf_update_resample(pf_t * pf, void * random_pose_data)
 {
-    //! 時間計測開始
-    long start = clock();
+    ClockCounter* counter = create_clock_counter("/home/amatsukaze/raspicat2/clock/pf_update_resample");
+    start_counter(counter);
   int i;
   double total;
   pf_sample_set_t * set_a, * set_b;
@@ -432,10 +432,7 @@ void pf_update_resample(pf_t * pf, void * random_pose_data)
   pf_update_converged(pf);
 
   free(c);
-    //! 時間計測終了
-    long stop = clock();
-    double sec = (start - stop) / CLOCKS_PER_SEC;
-    Writer("./AmclResampling", sec);
+    stop_counter(counter);
 }
 
 

@@ -20,7 +20,6 @@
  */
 
 #include "nav2_amcl/motion_model/differential_motion_model.hpp"
-#include "nav2_amcl/TimeCounter.hpp"
 
 namespace nav2_amcl
 {

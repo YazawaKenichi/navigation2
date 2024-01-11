@@ -1,3 +1,4 @@
-[submodule "nav2_amcl/TimeCounter"]
-	path = nav2_amcl/TimeCounter
-	url = git@github.com:yazawakenichi/TimeCounter.git
+[submodule "nav2_amcl/ClockCounter"]
+	path = nav2_amcl/ClockCounter
+	url = git@github.com:yazawakenichi/ClockCounter.git
+	branch = C

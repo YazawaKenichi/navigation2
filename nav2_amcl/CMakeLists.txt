@@ -22,6 +22,7 @@ nav2_package()
 
 include_directories(
   include
+  ClockCounter/ClockCounter
 )
 
 include(CheckSymbolExists)
@@ -42,10 +43,13 @@ set(library_name ${executable_name}_core)
 
 add_library(${library_name} SHARED
   src/amcl_node.cpp
-  src/TimeCounter.cpp
+  ClockCounter/ClockCounter/ClockCounter.c
 )
 
-target_include_directories(${library_name} PRIVATE src/include)
+target_include_directories(${library_name} PRIVATE
+    src/include
+    ClockCounter/ClockCounter
+)
 
 if(HAVE_DRAND48)
   target_compile_definitions(${library_name} PRIVATE "HAVE_DRAND48")

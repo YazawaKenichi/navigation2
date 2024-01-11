@@ -49,7 +49,6 @@
 #pragma GCC diagnostic pop
 
 #include "nav2_amcl/portable_utils.hpp"
-#include "nav2_amcl/TimeCounter.hpp"
 
 using namespace std::placeholders;
 using rcl_interfaces::msg::ParameterType;
@@ -920,8 +919,6 @@ AmclNode::publishAmclPose(
   const sensor_msgs::msg::LaserScan::ConstSharedPtr & laser_scan,
   const std::vector<amcl_hyp_t> & hyps, const int & max_weight_hyp)
 {
-    auto timecounter = TimeCounter::TimeCounter("./AmclNode::publishAmclPose", "publishAmclPose");
-    timecounter.startCounter();
   // If initial pose is not known, AMCL does not know the current pose
   if (!initial_pose_is_known_) {
     if (checkElapsedTime(2s, last_time_printed_msg_)) {
@@ -973,7 +970,6 @@ AmclNode::publishAmclPose(
     hyps[max_weight_hyp].pf_pose_mean.v[0],
     hyps[max_weight_hyp].pf_pose_mean.v[1],
     hyps[max_weight_hyp].pf_pose_mean.v[2]);
-  timecounter.stopCounter();
 }
 
 void
